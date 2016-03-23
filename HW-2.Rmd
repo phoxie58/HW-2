@@ -1,6 +1,6 @@
 ---
 title: "MATH 216 Homework 2"
-author: "WRITE YOUR NAME HERE"
+author: "Phil Hoxie"
 output: html_document
 ---
 
@@ -8,6 +8,8 @@ output: html_document
 suppressPackageStartupMessages(library(ggplot2))
 suppressPackageStartupMessages(library(dplyr))
 suppressPackageStartupMessages(library(foreign))
+suppressPackageStartupMessages(library(plotly))
+suppressPackageStartupMessages(library(RColorBrewer))
 ```
 
 
@@ -15,11 +17,11 @@ suppressPackageStartupMessages(library(foreign))
 
 Please indicate
 
-* Who you collaborated with:
-* Roughly how much time you spent on this HW:
-* What gave you the most trouble:
+* Who you collaborated with: Me, myself, and I
+* Roughly how much time you spent on this HW: 8 hrs
+* What gave you the most trouble: Manipulating text 
 * Any comments you have: 
-
+The Cross Validation was tricky, and I'm not sure that I did it right 
 
 
 
@@ -44,47 +46,212 @@ pollution <- read.dta(url) %>%
 ### a)
 
 ```{r, echo=FALSE, fig.width=12, fig.height=6}
+nm <- ggplot(data = pollution, aes(x=nox, y=mort)) +
+  geom_point() +
+  ggtitle("Mortality v Nitric Oxiedes")+
+  xlab("Nitric Oxide")+
+  ylab("Mortality per 100,000 People")
+ggplotly(nm)
+```
+
+It looks like there is no clear relationship between mortality and nitric oxide pollution. However, it could be possible that a small change in nitric oxide content could be associated with more significant changes in mortality. 
+
+```{r, echo=FALSE, fig.width=12, fig.height=6}
+reg.nm <- lm(mort~nox, data = pollution)
+summary(reg.nm)
+
+nm.1 <- ggplot(data = pollution, aes(x=nox, y=mort)) +
+  geom_point() +
+  geom_smooth(method='lm',formula=y~x, lwd=.25)+
+  ggtitle("Mortality v Nitric Oxiedes")
+ggplotly(nm.1)
 
 ```
 
+After running a simple model using only Nitric Oxide pollution (nox) to predict mortality rates, we fail to reject the null hypothesis that the coefficient is equal to zero. This leaves us with the counter intuitive result that it is likely to be the case that nitric oxide is not a good estimator of mortality (by itself). 
+
+```{r, echo=FALSE, fig.width=12, fig.height=6}
+residuals.nm <- resid(reg.nm)
+nm.resid <- ggplot(data = pollution, aes(x=nox, y = residuals.nm)) +
+  geom_point() 
+ggplotly(nm.resid)
+```
+
+This residual plot doesn't tell us very much because the coefficient was very small (and stastically most likely zero). 
+
+```{r, echo=FALSE, fig.width=12, fig.height=6}
+residuals.nm.df <- data.frame(resid(reg.nm))
+p <- ggplot(residuals.nm.df) +
+  stat_qq(aes(sample = resid.reg.nm.))+
+  ggtitle("Plot of Residuals for Mort~Nox")+
+  geom_abline(intercept = 0, slope = 0)
+p
+
+## Base is actually easier for this (I couldn't get ggplot to work)
+
+qqnorm(residuals(reg.nm), ylab="Residuals")
+qqline(residuals(reg.nm))
+```
+
+Looking at the Q-Q residual plots, we can see that our residuals are approximately normal in their distribution. There is some slight tailing, but not a lot. 
 
 ### b)
 
-```{r, echo=FALSE, fig.width=12, fig.height=6}
+```{r, echo=FALSE, results = "hide", fig.width=12, fig.height=6}
+pollution <- pollution %>% 
+  mutate(log.mort = log(mort))
+
+reg.nm.log <- lm(mort~nox, data = pollution)
+summary(reg.nm.log)
+
+pollution <- pollution %>% 
+  mutate(z.nox = scale(nox, center = TRUE, scale = TRUE))
+
+reg.nm.z <- lm(mort~z.nox, data = pollution)
+summary(reg.nm.z)
+
+## I include the failed regs just to illustrate what I tried
 
 ```
 
+```{r, echo=FALSE, fig.width=12, fig.height=6}
+pollution <- pollution %>% 
+  mutate(log.nox = log(nox))
+
+reg.nm.log.nox <- lm(mort~log.nox, data = pollution)
+summary(reg.nm.log.nox)
+
+nm.log.nox <- ggplot(data = pollution, aes(x=log.nox, y=mort)) +
+  geom_point() +
+  geom_smooth(method='lm',formula=y~x, lwd=.25)+
+  ggtitle("Mortality v Nitric Oxiedes")+
+  xlab("Log of Nitric Oxide Content")+
+  ylab("Age Adjusted Mortality per 100,000")
+ggplotly(nm.log.nox)
+```
+
+After we transform the data by taking the natural log of the nitric oxide polutant variable (generating a new variable "log.nox") we get a slightly better model. The coefficient is now significant with 95% confidence. The R-Squared, however, is quite low. Our modified regression only explains about 7% of the variance in Mortality. 
+
+```{r, echo=FALSE, fig.width=12, fig.height=6}
+qqnorm(residuals(reg.nm.log.nox), ylab="Residuals")
+qqline(residuals(reg.nm.log.nox))
+```
+
+Our Q-Q Norm plot of residuals is okay, with slight tailing at the lower and upper quantiles. 
 
 ### c)
 
-```{r, echo=FALSE, fig.width=12, fig.height=6}
-
-```
-
+By taking the natural log of nitric oxide pollution, we are showing that a small change in nitric oxide content is associated with significant increases in mortality. On average, every 1 unit increase in the natural log of nitric oxide pollution is associated with about 15 more deaths per 100,000 people (age adjusted). 
 
 ### d)
 
-```{r, echo=FALSE, fig.width=12, fig.height=6}
+```{r, echo=FALSE, results = "hide", fig.width=12, fig.height=6}
+reg.mult <- lm(mort~nox+so2+hc, data = pollution)
+summary(reg.mult)
 
+reg.mult.log.nox <- lm(mort~log.nox+so2+hc, data = pollution)
+summary(reg.mult.log.nox)
+
+reg.so2 <- lm(mort~so2, data = pollution)
+summary(reg.so2)
+
+plot(pollution$so2, pollution$mort)
+
+reg.hc <- lm(mort~hc, data = pollution)
+summary(reg.hc)
+
+plot(pollution$hc, pollution$mort)
+
+reg.mult.log.2 <- lm(mort~log.nox+so2+log(hc), data = pollution)
+summary(reg.mult.log.2)
+## again, I included all of my regs to show my thought process to get better feedback
+## the multiple reg with the log transformation of nox is best
 ```
 
+```{r, echo=FALSE, fig.width=12, fig.height=6}
+reg.mult.log.nox <- lm(mort~log.nox+so2+hc, data = pollution)
+summary(reg.mult.log.nox)
+```
+
+Once we include Sulfur Dioxide and Hydro Carbon pollution in our model, we get a more accurate picture by accounting for omited variable bias. 
+
+```{r, echo=FALSE, fig.width=12, fig.height=6}
+pairs(~log.nox+so2+hc, data=pollution,
+      main="Pollutant Correlation Matrix")
+```
+
+It does look like there is a correlation between log.nox and the other pollutants. This shows the omitted variable bias from our earlier models. 
+
+```{r, echo=FALSE, fig.width=12, fig.height=6}
+mult.reg.plot <- ggplot(pollution, aes(x = log.nox, y = mort, color = so2))+
+  geom_point(aes(size = hc))+
+  geom_abline(intercept = 884.75721, slope = 23.88604)+
+  ggtitle("Pollutants and Mortality Rates")+
+  xlab("Natural Log of Nitric Oxide Content")+
+  ylab("Adjusted Mortality Rate")
+mult.reg.plot
+```
+
+The above graphi shows the natural log of Nitric Oxide content and mortality. Our new model, which controls for Sulfur and hydrocarbon content, is in black. However, the omitted variable bias will be made clear once we add our old regression line to the plot, in Red. 
+
+```{r, echo=FALSE, fig.width=12, fig.height=6}
+mult.reg.plot <- ggplot(pollution, aes(x = log.nox, y = mort, color = so2))+
+  geom_point(aes(size = hc))+
+  geom_abline(intercept = 904.724, slope = 15.335, color = "red")+
+  geom_abline(intercept = 884.75721, slope = 23.88604)+
+  ggtitle("Pollutants and Mortality Rates")+
+  xlab("Natural Log of Nitric Oxide Content")+
+  ylab("Adjusted Mortality Rate")
+mult.reg.plot
+```
+
+Comparing the two regression lines, we see that the simple regression line (in red) is negatively biased and that the line which controls for other pollutants (in black) shows a much stronger relationship between small changes in nitric oxides and mortality. 
 
 ### e)
 
 ```{r, echo=FALSE, fig.width=12, fig.height=6}
+pol.test <- sample_frac(pollution, .5)
+pol.validate <- anti_join(pollution, pol.test)
+
+reg.test <- lm(mort~log.nox+so2+hc, data = pol.test)
+summary(reg.test)
 
 ```
 
+We have split the data in half, randomly. This model uses our multiple regression from above to fit half of our data (30 observations). 
 
-### f) What do you think are the reasons for using cross-validation?
 
-
+```{r, echo=FALSE, results = "hide", fig.width=12, fig.height=6}
+pol.validate <- pol.validate %>% 
+  mutate(mort.hat = 876.4122 + 32.0161*(log.nox) + 0.2832*(so2) - 0.4222*(hc)) %>% 
+  mutate(sq.resid = (mort - mort.hat)^2) %>% 
+  mutate(tot.sum.sq = (mort - mean(mort))^2)
+sum.val.table <- pol.validate %>% 
+  summarise(SSR = sum(sq.resid), TSS = sum(tot.sum.sq))
+sum.val.table %>% 
+  mutate(R.Sq = 1 - (SSR/TSS))
+```
 
 ```{r, echo=FALSE, fig.width=12, fig.height=6}
 
+valid.plot <- ggplot(data = pol.validate, aes(x = log.nox, y = mort, color = so2))+
+  geom_point(aes(size = hc))+
+  geom_abline(slope = 32.0161, intercept = 876.4122)+
+  ggtitle("Cross Validation of Multiple Reg")+
+  xlab("Natural Log of Nitric Oxide Content")+
+  ylab("Adjusted Mortality Rate")
+valid.plot
+
+sum.val.table
+
 ```
 
 
+When we use our model we made using the one half of the data and fit it to the other half, we get an R-Squared of about .287. This says that our model explains only around 29% of the variation in mortality, even after controlling for hydrocarbons and sulfur. 
+
+### f) What do you think are the reasons for using cross-validation?
+
+It seems like cross validation puts additional stress on the model by reducing the number of observations. This resulted in a lower R-Squared than when we used the same model on the entire data set. 
 
 
 
@@ -110,12 +277,201 @@ profiles <- read.csv("profiles.csv", header=TRUE) %>% tbl_df()
 
 
 ```{r, echo=FALSE, fig.width=12, fig.height=6}
-# Feel free to make multiple code blocks, but set echo, fig.width, fig.height as 
-# above
+essays <- select(profiles, contains("essay"))
+profiles <- select(profiles, -contains("essay"))
+profiles.1 <- profiles %>% sample_frac(0.1)
+
+profiles <- profiles %>% 
+  mutate(female = ifelse(sex=="f", 1, 0))
+
+profiles.1 <- profiles.1 %>% 
+  mutate(female = ifelse(sex=="f", 1, 0))
+
+sex.prop <- profiles %>% 
+  group_by(sex) %>% 
+  tally() %>% 
+  mutate(prop = n/(cumsum(n)))
+sex.prop
 ```
 
+It looks like about 60% of OKCupid users were male. 
 
 ```{r, echo=FALSE, fig.width=12, fig.height=6}
-# Feel free to make multiple code blocks, but set echo, fig.width, fig.height as 
-# above
+box.age <- ggplot(data = profiles, aes(x=factor(sex), y=age))+
+  geom_boxplot()+
+  xlab("Sex")
+box.age
+
+box.h <- ggplot(data = profiles, aes(x=factor(sex), y=height))+
+  geom_boxplot()+
+  xlab("Sex")+
+  ggtitle("Height by Sex")
+box.h
 ```
+
+From these box plots, it looks like there is greater variance in the ages of female users, but the median age appears to be lower than the median age for men. Also, men appear to be taller than women. 
+
+```{r, echo=FALSE, fig.width=12, fig.height=6}
+age.height.plot <- 
+  ggplot(data = profiles.1, aes(x=age, y = height, color = sex))+
+  geom_point(position = "jitter")+
+  ggtitle("Age and Height by Sex")
+age.height.plot
+```
+
+This plot shows the distribution of both age and height by sex. There appear to be two distinct clouds. The men appear to be taller, all though there is overlap. 
+
+```{r, echo=FALSE, fig.width=12, fig.height=6}
+body.sex <- profiles %>% 
+  group_by(sex, body_type) %>% 
+  summarise(n = n()) %>% 
+  mutate(prop = n / sum(n))
+
+body.type.bar <- 
+  ggplot(data = body.sex, aes(x = sex, y = prop, fill = sex, color = sex))+
+  geom_bar(stat = "identity")+
+  facet_wrap(~body_type)+
+  ggtitle("Self-Described Body Type by Sex")+
+  ylab("Proportion of Population")
+
+body.type.bar
+```
+
+These bar plots show self-reported body types, by sex. There are a few interesting things to pick out from this. First, a much higher proportion of women described themselves as "overweight". Second, more men are self-proclaimed athletes (they have "athletic" bodies). A surprisingly low number of men described themsleves as "jacked". This may because most of them work in tech. 
+
+```{r, echo=FALSE, fig.width=12, fig.height=6}
+diet.sex <- profiles %>% 
+  group_by(sex, diet) %>% 
+  summarise(n = n()) %>% 
+  mutate(prop = n / sum(n))
+
+diet.bar <- 
+  ggplot(data = diet.sex, aes(x = sex, y = prop, fill = sex, color = sex))+
+  geom_bar(stat = "identity")+
+  facet_wrap(~diet)+
+  ggtitle("Slef-Reported Eating Habbits by Sex")+
+  ylab("Proportion of Population")
+diet.bar
+```
+
+Around 40% of men and women chose not to report their eating habbits. In fact, most eating habbits that were reported didn't seem to differ on the basis of sex. 
+
+```{r, echo=FALSE, fig.width=12, fig.height=6}
+drinks.sex <- profiles %>% 
+  group_by(sex, drinks) %>% 
+  summarise(n = n()) %>% 
+  mutate(prop = n / sum(n))
+
+
+drinks.bar <- 
+  ggplot(data = drinks.sex, aes(x = sex, y = prop, fill = sex, color = sex))+
+  geom_bar(stat = "identity")+
+  facet_wrap(~drinks)+
+  ggtitle("Slef-Reported Drinking Habbits by Sex")+
+  ylab("Proportion of Population")
+drinks.bar
+```
+
+Much like eating habbits, drinking habbit did not greatly differ by sex, although around 60% of men and women drink socially. 
+
+```{r, echo=FALSE, fig.width=12, fig.height=6}
+drugs.sex <- profiles %>% 
+  group_by(sex, drugs) %>% 
+  summarise(n = n()) %>% 
+  mutate(prop = n / sum(n))
+
+
+drugs.bar <- 
+  ggplot(data = drugs.sex, aes(x = sex, y = prop, fill = sex, color = sex))+
+  geom_bar(stat = "identity")+
+  facet_wrap(~drugs)+
+  ggtitle("Slef-Reported Eating Habbits by Sex")+
+  ylab("Proportion of Population")
+drugs.bar
+```
+
+For both men and women, over 60% of resondents say that they never do drugs. 
+
+```{r, echo=FALSE, fig.width=12, fig.height=6}
+profiles <-  
+  profiles %>% mutate(income = replace(income, income<0, NA))
+profiles.1 <-  
+  profiles.1 %>% mutate(income = replace(income, income<0, NA))
+
+sex.inc <- profiles %>% 
+  group_by(sex) %>% 
+  summarise(avg.inc = mean(income, na.rm =TRUE), med.inc = median(income, na.rm = TRUE))
+sex.inc
+
+inc.bar <- 
+  ggplot(data = sex.inc, aes(x = sex, y = med.inc, fill = sex, color = sex))+
+  geom_bar(stat = "identity")+
+  ggtitle("Median Reported Income by Sex")+
+  ylab("Median Income (USD)")
+ggplotly(inc.bar)
+
+inc.bar2 <- 
+  ggplot(data = sex.inc, aes(x = sex, y = avg.inc, fill = sex, color = sex))+
+  geom_bar(stat = "identity")+
+  ggtitle("Average Reported Income by Sex")+
+  ylab("Average Income (USD)")
+ggplotly(inc.bar2)
+```
+
+From the two bar graphs above, we can see that men report having much higher incomes than women. However, 4826 users did not report their income at all. 
+
+```{r, echo=FALSE, results = "hide", fig.width=12, fig.height=6}
+sum(is.na(profiles$income))
+```
+
+```{r, echo=FALSE, fig.width=12, fig.height=6}
+orientation.sex <- profiles %>% 
+  group_by(sex, orientation) %>% 
+  summarise(n = n()) %>% 
+  mutate(prop = n / sum(n))
+
+
+orientation.bar <- 
+  ggplot(data = orientation.sex, aes(x = sex, y = prop, fill = sex, color = sex))+
+  geom_bar(stat = "identity")+
+  facet_wrap(~orientation)+
+  ggtitle("Sexual Oreintation by Sex")+
+  ylab("Proportion of Population")
+orientation.bar
+```
+
+Almost 80% of all users are heterosexual. However, a higher proportion of women report to be bisexual and a higher proportion of men report to be gay. 
+
+```{r, echo=FALSE, fig.width=12, fig.height=6}
+smoke.sex <- profiles %>% 
+  group_by(sex, smokes) %>% 
+  summarise(n = n()) %>% 
+  mutate(prop = n / sum(n))
+
+smoke.bar <- 
+  ggplot(data = smoke.sex, aes(x = sex, y = prop, fill = sex, color = sex))+
+  geom_bar(stat = "identity")+
+  facet_wrap(~smokes)+
+  ggtitle("Smoking Habbits by Sex")+
+  ylab("Proportion of Population")
+smoke.bar
+```
+
+Smoking habbits also seem to be pretty much the same across genders. Most repsondents say that they don't smoke. 
+
+```{r, echo=FALSE, fig.width=12, fig.height=6}
+status.sex <- profiles %>% 
+  group_by(sex, status) %>% 
+  summarise(n = n()) %>% 
+  mutate(prop = n / sum(n))
+
+status.bar <- 
+  ggplot(data = status.sex, aes(x = sex, y = prop, fill = sex, color = sex))+
+  geom_bar(stat = "identity")+
+  facet_wrap(~status)+
+  ggtitle("Relationship Status by Sex")+
+  ylab("Proportion of Population")
+status.bar
+```
+
+Finally, most users on the site are single (why else would they use it?). Although, there are a few married and other committed individuals who like to "window shop". 
