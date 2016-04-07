@@ -10,6 +10,7 @@ suppressPackageStartupMessages(library(dplyr))
 suppressPackageStartupMessages(library(foreign))
 suppressPackageStartupMessages(library(plotly))
 suppressPackageStartupMessages(library(RColorBrewer))
+suppressPackageStartupMessages(library(knitr))
 ```
 
 
@@ -56,9 +57,10 @@ ggplotly(nm)
 
 It looks like there is no clear relationship between mortality and nitric oxide pollution. However, it could be possible that a small change in nitric oxide content could be associated with more significant changes in mortality. 
 
+Here is the reg table using the kable() funtion
 ```{r, echo=FALSE, fig.width=12, fig.height=6}
 reg.nm <- lm(mort~nox, data = pollution)
-summary(reg.nm)
+kable(summary(reg.nm)$coef, digits=2)
 
 nm.1 <- ggplot(data = pollution, aes(x=nox, y=mort)) +
   geom_point() +
@@ -214,8 +216,12 @@ pol.test <- sample_frac(pollution, .5)
 pol.validate <- anti_join(pollution, pol.test)
 
 reg.test <- lm(mort~log.nox+so2+hc, data = pol.test)
-summary(reg.test)
 
+predict(reg.test)
+predict(reg.test, pol.validate)
+
+summary(reg.test)
+## plot y = x with reals and estimates
 ```
 
 We have split the data in half, randomly. This model uses our multiple regression from above to fit half of our data (30 observations). 
@@ -309,7 +315,7 @@ box.h <- ggplot(data = profiles, aes(x=factor(sex), y=height))+
 box.h
 ```
 
-From these box plots, it looks like there is greater variance in the ages of female users, but the median age appears to be lower than the median age for men. Also, men appear to be taller than women. 
+From these noramlized box plots, it looks like there is greater variance in the ages of female users, but the median age appears to be lower than the median age for men. Also, men appear to be taller than women. 
 
 ```{r, echo=FALSE, fig.width=12, fig.height=6}
 age.height.plot <- 
@@ -337,6 +343,13 @@ body.type.bar <-
 body.type.bar
 ```
 
+I should have done the bar graphs using geom_bar, dodge.
+```{r, echo=FALSE, fig.width=12, fig.height=6}
+  
+ body.type.bar2 <- plot_ly(data = body.sex, x = body_type, y = prop, type = "bar", color = sex, hoverinfo="all")
+body.type.bar2 <- layout(title = "Self-described Body Types by Sex")
+body.type.bar2
+```
 These bar plots show self-reported body types, by sex. There are a few interesting things to pick out from this. First, a much higher proportion of women described themselves as "overweight". Second, more men are self-proclaimed athletes (they have "athletic" bodies). A surprisingly low number of men described themsleves as "jacked". This may because most of them work in tech. 
 
 ```{r, echo=FALSE, fig.width=12, fig.height=6}
